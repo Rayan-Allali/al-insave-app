@@ -48,7 +48,7 @@ export default function UploadVideo() {
     try {
       setRecording(true);
 
-      const recorded = await cameraRef.current?.recordAsync({ maxDuration: 30 });
+      const recorded = await cameraRef.current?.recordAsync({ maxDuration: 30,quality:'360p' });
       const videoUri = recorded?.uri;
 
       if (!videoUri) throw new Error("Failed to record video.");
