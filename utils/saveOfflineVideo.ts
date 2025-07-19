@@ -31,7 +31,7 @@ export const saveToUnsyncedData = async (donationId: string, videoPath: string, 
     console.log(`[✔] Saved ${donationId} to UnsyncedData and removed from offlineDonations`);
     console.log(`Saved offline video for donation ${donationId}`);
     //reload force
-   router.push({ pathname: '/(tabs)/index', params: { refresh: Date.now().toString() } });
+   router.push({  pathname: '/', params: { refresh: Date.now().toString() } });
   } catch (e) {
     console.error('Error saving to UnsyncedData', e);
   }
