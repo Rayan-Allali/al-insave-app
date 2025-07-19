@@ -1,10 +1,12 @@
+import { updateDonationToProcess } from "@/backend/updateStatus.backend";
 import { baseUrl } from "@/constants/baseApi";
 import { useConnectionAwareAction } from "@/hooks/useConnectionAwareAction";
+import { saveToUnsyncedData } from "@/utils/saveOfflineVideo";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Slider from "@react-native-community/slider";
-import axios from "axios";
 import { Camera, CameraView } from "expo-camera";
 import * as FileSystem from "expo-file-system";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -14,7 +16,22 @@ import {
   View,
 } from "react-native";
 
-export default function UploadVideo() {
+
+// const getDonationById = async (id) => {
+//   const localRaw = await AsyncStorage.getItem('offlineDonations');
+//   if (localRaw) {
+//     const localDonations = JSON.parse(localRaw);
+//     const found = localDonations.find((d) => d._id === id);
+//     if (found) return found;
+//   }
+
+//   const res = await getDonationByIdAPI(id);
+//   return res.data;
+// };
+
+
+export default function UploadPreuve() {
+    const { id } = useLocalSearchParams();
   const [cameraPermission, setCameraPermission] = useState();
   const [micPermission, setMicPermission] = useState();
   const [cameraMode, setCameraMode] = useState("video");
@@ -23,6 +40,7 @@ export default function UploadVideo() {
   const [zoom, setZoom] = useState(0);
   const cameraRef = useRef(null);
 
+    const router = useRouter();
   const { runAction } = useConnectionAwareAction();
 
   useEffect(() => {
@@ -53,7 +71,7 @@ export default function UploadVideo() {
 
       if (!videoUri) throw new Error("Failed to record video.");
 
-      const filename = `video_${Date.now()}.mp4`;
+      const filename = `video_${id}_${Date.now()}.mp4`;
       const savedPath = FileSystem.documentDirectory + filename;
 
       await FileSystem.copyAsync({
@@ -65,6 +83,8 @@ export default function UploadVideo() {
 
       const uploadVideo = async () => {
         const formData = new FormData();
+      formData.append('status','proceeded')
+      formData.append('id',id)
         formData.append("videoUrl", {
           uri: savedPath,
           name: filename,
@@ -73,27 +93,31 @@ export default function UploadVideo() {
 
         try {
           
+          
+          console.log("id ",id)
           console.log("baseUrl ",baseUrl)
-          const response = await axios.post(`${baseUrl}/upload`, formData, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          });
-
+          //cahange endpoint
+          const response = await updateDonationToProcess(formData)
           console.log("response stauts",response.status )
           if (response.status === 200) {
             Alert.alert("✅ Video uploaded!");
+            //delete the video from FileSystem.documentDirectory 
           } else {
+            //save in local db like we said
+            await saveToUnsyncedData(id, savedPath, filename,router);
             Alert.alert("⚠️ Upload failed. Video is saved locally.");
           }
         } catch (err) {
           console.error(err);
           Alert.alert("❌ Upload error. Video is saved locally.");
+          //save in local db like we said
+          await saveToUnsyncedData(id, savedPath, filename,router);
         }
       };
 
       const saveForLater = async () => {
         Alert.alert("📴 Offline: Video saved for later upload.");
+       await saveToUnsyncedData(id, savedPath, filename,router);
       };
 
       await runAction(uploadVideo, saveForLater);

@@ -1,76 +1,66 @@
-import React, { useState } from 'react';
+import { DonationRecord, getAllDonations } from '@/backend/donation.backend';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
-type Donor = {
-  name: string;
-};
-
-type DonationRecord = {
-  id: string;
-  animalType: 'sheep' | 'goat' | 'cow';
-  donors: Donor[];
-};
-
-const MOCK_DONATIONS: DonationRecord[] = [
-  {
-    id: '1',
-    animalType: 'sheep',
-    donors: [
-      { name: 'Karina MKJ' },
-      { name: 'Manel' },
-      { name: 'Amira' },
-      { name: 'Kamel Rabi' },
-    ],
-  },
-  {
-    id: '2',
-    animalType: 'goat',
-    donors: [{ name: 'Sofiane Ben' }],
-  },
-  {
-    id: '3',
-    animalType: 'cow',
-    donors: [{ name: 'Tariq Father' }],
-  },
-];
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DonationListScreen() {
-  const [donations, setDonations] = useState<DonationRecord[]>(MOCK_DONATIONS);
+  const { refresh } = useLocalSearchParams();
+const [donations, setDonations] = useState<DonationRecord[] | null>(null);
+const [isLoading, setIsLoading] = useState(true);
+const [error, setError] = useState<Error | null>(null);
+
+useEffect(() => {
+  const fetchDonations = async () => {
+    try {
+      console.log("Fetching donations...");
+      setIsLoading(true);
+
+      const localRaw = await AsyncStorage.getItem('offlineDonations');
+
+      if (localRaw) {
+        console.log("local data exist....")
+        setDonations(JSON.parse(localRaw));
+      } else {
+        const response = await getAllDonations();
+        console.log("Donations fetched:", response.data.length);
+        await AsyncStorage.setItem('offlineDonations', JSON.stringify(response.data));
+        setDonations(response.data);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError(err as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchDonations();
+}, [refresh]);
+
+
   const [selectedAnimal, setSelectedAnimal] = useState<string>('all');
 
-  const handleSubmit = (id: string) => {
-    Alert.alert(
-      'Upload Video',
-      'Are you sure you want to submit the video?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Submit',
-          onPress: () => {
-            // Simulate upload
-            setDonations((prev) => prev.filter((d) => d.id !== id));
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+  
+
+  const router = useRouter();
+
+const goToUpload = (donationId: string) => {
+  router.push('/uploadPreuve/'+ donationId as any);
+};
 
   const filteredDonations =
     selectedAnimal === 'all'
       ? donations
-      : donations.filter((d) => d.animalType === selectedAnimal);
+      : (donations || []).filter((d) => d.animalType === selectedAnimal);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -100,23 +90,23 @@ export default function DonationListScreen() {
 
       <FlatList
         data={filteredDonations}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Donation #{item.id}</Text>
+            <Text style={styles.cardTitle}>Donation #{item.trackingCode}</Text>
             <Text style={styles.cardSubtitle}>
               Animal Type: {item.animalType}
             </Text>
             <Text style={styles.donorTitle}>Donor Names:</Text>
-            {item.donors.map((donor, idx) => (
+            {item.donorsDetails.map((donor, idx) => (
               <Text key={idx} style={styles.donorName}>
-                - {donor.name}
+                - {donor.donorId.firstName +donor.donorId.lastName }
               </Text>
             ))}
             <TouchableOpacity
               style={styles.button}
-              onPress={() => handleSubmit(item.id)}
+              onPress={() => goToUpload(item._id)}
             >
               <Text style={styles.buttonText}>Submit Video</Text>
             </TouchableOpacity>
